@@ -1,31 +1,110 @@
-# Image Classifier Application
+# Animal Heads Image Classifier
 
-This repository contains the code for an image classifier machine learning application deployed on Flask, a popular Python web framework. The application allows users to upload images and receive predictions about the contents of those images based on a pre-trained machine learning model.
+This repository contains an image classification application that identifies and classifies images of animal heads into 20 different classes. The project involves various stages of image preprocessing, feature extraction, and model training.
 
-## Application Overview
+## Dataset Description
 
-The backend of the application utilizes Flask to handle incoming HTTP requests, process uploaded images, and interface with the machine learning model. This setup enables a seamless interaction where users can easily upload images and get instant predictions on what the images contain.
-
-## Machine Learning Model
-
-The core of this application is a convolutional neural network (CNN) designed for image classification. The model has been trained on the CIFAR-10 dataset, which includes images across 10 different categories such as airplanes, dogs, cars, and more.
-
-### Model Pipeline and Serialization
-
-To streamline the process of using the machine learning model within the Flask application, the model has been saved in a pickle format. This serialization facilitates easy loading and inference within the application's environment. Additionally, the model has been integrated into a pipeline, ensuring that image data is appropriately pre-processed before making predictions.
-
-### Hyperparameter Tuning
-
-The model's performance was optimized using grid search for hyperparameter tuning. This process involved systematically varying model parameters to find the combination that results in the best prediction accuracy.
-
-## Deployment
-
-The application has been deployed to Render, making it accessible via the following live link: [https://imageclassifier-ca7c.onrender.com/](https://imageclassifier-ca7c.onrender.com/). This deployment allows users from anywhere to access the application and use it to classify their own images.
+- **Classes**: 20 different animal heads
+- **Total Images**: 2057
+- **Image Size**: 80x80 pixels, RGB format
 
 ## Built With
 
-- **Flask Framework:** Used for handling HTTP requests, serving the web application, and interfacing with the machine learning model.
-- **TensorFlow and Keras:** For building and training the convolutional neural network model.
-- **Pickle:** For serializing the model and integrating it into the Flask application.
-- **Render:** For hosting and deploying the web application.
+- **Flask Framework**: For handling HTTP requests and serving the web application.
+- **TensorFlow and Keras**: For building and training the convolutional neural network model.
+- **Pickle**: For serializing the model and integrating it into the Flask application.
+- **Render**: For hosting and deploying the web application.
+- **Scikit-learn**: For machine learning and feature extraction.
 
+## Project Overview
+
+The project involves:
+1. Preprocessing images to grayscale.
+2. Extracting features using Histogram of Oriented Gradients (HOG).
+3. Normalizing features and training a Stochastic Gradient Descent (SGD) classifier.
+4. Evaluating the model using Grid Search for hyperparameter tuning.
+5. Deploying the model in a Flask application for image classification.
+
+## Code Overview
+
+### HOG Feature Extraction
+
+A custom transformer class for extracting HOG features from images:
+
+```python
+from sklearn.base import BaseEstimator, TransformerMixin
+import skimage.feature
+
+class hogtransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, orientations=9, pixels_per_cell=(8, 8), cells_per_block=(3, 3)):
+        self.orientations = orientations
+        self.pixels_per_cell = pixels_per_cell
+        self.cells_per_block = cells_per_block
+        
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X, y=None):
+        def local_hog(img):
+            hog_features = skimage.feature.hog(img, orientations=self.orientations,
+                                               pixels_per_cell=self.pixels_per_cell,
+                                               cells_per_block=self.cells_per_block)
+            return hog_features
+        
+        hfeatures = np.array([local_hog(x) for x in X])
+        return hfeatures
+
+##**Pipeline for Model Training**
+**A pipeline that integrates grayscale conversion, HOG feature extraction, scaling, and classification:**
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import SGDClassifier
+from sklearn.preprocessing import StandardScaler
+from skimage.color import rgb2gray
+
+model_pipe = Pipeline([
+    ('grayscale', rgb2gray_transform()),
+    ('hogtransform', hogtransformer(orientations=8, pixels_per_cell=(10, 10), cells_per_block=(3, 3))),
+    ('scaler', StandardScaler()),
+    ('sgd', SGDClassifier(loss='hinge', learning_rate='adaptive', early_stopping=True, eta0=0.1))
+])
+
+model_pipe.fit(x_train, y_train)
+##**Hyperparameter Tuning with Grid Search**
+**Optimize hyperparameters using Grid Search:**
+```python
+from sklearn.model_selection import GridSearchCV
+
+estimator = Pipeline([
+    ('grayscale', rgb2gray_transform()),
+    ('hogtransform', hogtransformer()),
+    ('scaler', StandardScaler()),
+    ('sgd', SGDClassifier())
+])
+
+param_grid = [
+    {
+        'hogtransform__orientations': [7, 8, 9, 10],
+        'hogtransform__pixels_per_cell': [(7, 7), (8, 8), (9, 9)],
+        'hogtransform__cells_per_block': [(2, 2), (3, 3)],
+        'sgd__loss': ['hinge', 'squared_hinge', 'perceptron'],
+        'sgd__learning_rate': ['optimal']
+    },
+    {
+        'hogtransform__orientations': [7, 8, 9, 10],
+        'hogtransform__pixels_per_cell': [(7, 7), (8, 8), (9, 9)],
+        'hogtransform__cells_per_block': [(2, 2), (3, 3)],
+        'sgd__loss': ['hinge', 'squared_hinge', 'perceptron'],
+        'sgd__learning_rate': ['adaptive'],
+        'sgd__eta0': [0.001, 0.01]
+    }
+]
+
+grid_search = GridSearchCV(estimator, param_grid, cv=5, scoring='accuracy')
+grid_search.fit(x_train, y_train)
+
+##**Deployment**
+The application has been deployed to Render, making it accessible globally. You can use the live application to classify your own images by uploading them to the web interface.
+
+Live link: Image Classifier Live  
+https://imageclassifier-ca7c.onrender.com/
